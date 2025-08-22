@@ -1,0 +1,90 @@
+name: se_backend
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend-dev
+    command: sh -c "python manage.py makemigrations --no-input &&
+      python manage.py migrate --no-input && python manage.py runserver 0.0.0.0:${APP_PORT} && wait"
+    environment:
+      DJANGO_SETTINGS_MODULE: se_backend.settings
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: backend_db
+      DB_PORT: ${DB_PORT}
+      STATIC_URL: ${STATIC_URL}
+      STATIC_ROOT: ${STATIC_ROOT}
+      MEDIA_URL: ${MEDIA_URL}
+      MEDIA_ROOT: ${MEDIA_ROOT}
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_HOST: ${RESEND_HOST}
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN}
+    depends_on:
+      backend_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    volumes:
+      - .:/app
+    working_dir: /app
+
+  backend_db:
+    image: postgres:latest
+    volumes:
+      - prototype-backend:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    container_name: backend-db
+    ports:
+      - "5433:5433"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $DB_USER -d $DB_NAME" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  redis:
+    image: redis:alpine
+    container_name: redis_broker
+    restart: always
+    command: redis-server --bind 0.0.0.0 --protected-mode no
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A se_backend worker --loglevel=info
+    depends_on:
+      - redis
+      - backend_db
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+
+  celery_beat:
+    build: .
+    container_name: celery_beat
+    command: celery -A se_backend beat --loglevel=info
+    depends_on:
+      - redis
+      - backend_db
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+
+volumes:
+  prototype-backend:
