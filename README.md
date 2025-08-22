@@ -1,4 +1,4 @@
-# Fresco by Meobel - Payroll and Attendance System
+# Payroll and Attendance System
 
 This project is a full-stack **Payroll and Attendance System** for a restaurant with over 30 employees. It streamlines **attendance tracking**, **payroll processing**, **payslip generation**, and **scheduling**. The application simplifies critical administrative tasks for the business.
 
